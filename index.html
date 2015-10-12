@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Checksum demo</title>
+    <script src="./fletcher32.js"></script>
+    <script>
+      function computeFileHash(file) {
+        console.time('file checksum');
+        var fileSize = file.size;
+        var chunkSize = 5 * 1024 * 1024;
+        var chunksTotal = Math.ceil(fileSize / chunkSize);
+        var checksum = Fletcher32();
+        var progressLabel = document.getElementById('file_hash_progress');
+        var resultLabel = document.getElementById('file_hash_result');
+        progressLabel.style.display = '';
+        resultLabel.style.display = 'none';
+
+        (function tick(chunkIndex) {
+          if (chunkIndex == chunksTotal) {
+            var hash = checksum.result();
+            console.timeEnd('file checksum');
+            progressLabel.style.display = 'none';
+            resultLabel.innerHTML = hash.toString(16);
+            resultLabel.style.display = '';
+            return;
+          }
+          var start = chunkIndex * chunkSize;
+          var end = start + chunkSize + 1;
+          var chunk = file.slice(start, end);
+
+          readBlobData(chunk, function(data) {
+            checksum.append(data);
+            tick(chunkIndex + 1);
+          });
+
+          progressLabel.innerHTML = 'Progress: ' + Math.round(chunkIndex / chunksTotal * 100) + '%';
+        })(0);
+      }
+
+      function readBlobData(blob, callback) {
+        var reader = new FileReader();
+        reader.addEventListener('loadend', function(e) {
+          var data = new Uint8Array(e.target.result);
+          callback(data);
+        });
+        reader.readAsArrayBuffer(blob);
+      }
+
+      function computeStringHash(string) {
+        var resultLabel = document.getElementById('string_hash_result');
+        if (!string.length) {
+          resultLabel.innerHTML = '';
+          return;
+        }
+
+        var data = string.split('').map(function(item) {
+          return item.charCodeAt(0);
+        });
+        var cs = Fletcher32();
+        cs.append(data);
+        var hash = cs.result();
+
+        resultLabel.innerHTML = hash.toString(16);
+      }
+    </script>
+    <style>
+      #string_hash_result,
+      #file_hash_result {
+        font-family: Courier;
+      }
+    </style>
+  </head>
+  <body>
+    <p>
+      <label for="string_input">Compute string Fletcher-32 checksum</label>
+      <br>
+      <input id="string_input" onkeyup="computeStringHash(this.value)">
+      <div id="string_hash_result"></div>
+    </p>
+    <p>
+      <label for="file_input">Compute file Fletcher-32 checksum</label>
+      <br>
+      <input id="file_input" type="file" onchange="computeFileHash(this.files[0])">
+      <div id="file_hash_progress" style="display: none"></div>
+      <div id="file_hash_result"></div>
+    </p>
+  </body>
+</html>
